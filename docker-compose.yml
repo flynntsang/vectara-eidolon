@@ -1,0 +1,59 @@
+services:
+  agent-server:
+    image: my-eidolon-project:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    develop:
+      watch:
+        - path: ./components
+          action: rebuild
+        - path: ./pyproject.toml
+          action: rebuild
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    volumes:
+      - ./resources:/bound_resources
+      - eidolon_data:/data/eidolon/files
+    command: /bound_resources/ -m sample-machine --reload --fail-on-bad-agent true
+    depends_on:
+      - mongo
+      - chromadb
+
+  webui:
+    image: eidolonai/webui:latest
+    environment:
+      - NEXTAUTH_SECRET=secret
+      - EIDOLON_SERVER=http://agent-server:8080
+      - EIDOLON_APP_REGISTRY_LOC=/app/apps/eidolon-ui2/eidolon-apps-override.json
+    volumes:
+      - ./webui.apps.json:/app/apps/eidolon-ui2/eidolon-apps-override.json
+    ports:
+      - "3000:3000"
+    depends_on:
+      - agent-server
+
+  mongo:
+    image: mongo
+    command:
+      - --dbpath
+      - /data/db
+      - --logpath
+      - /dev/null
+    volumes:
+      - mongodb_data:/data/db
+
+  chromadb:
+    image: chromadb/chroma
+    environment:
+      - CHROME_USER_DATA_DIR=/chromadb/data
+    volumes:
+      - chromadb_data:/chromadb/data
+
+
+volumes:
+  mongodb_data:
+  eidolon_data:
+  chromadb_data:

@@ -1,0 +1,29 @@
+name: Start Server
+description: Start agent server and check it is running
+
+runs:
+  using: 'composite'
+  steps:
+    - name: start server
+      shell: bash
+      run: |
+        set +o pipefail
+        yes TESTVALUE | make .env
+        set -o pipefail
+        make docker-serve ARGS="> container_logs.txt 2>&1 &"
+    - name: wait for server to start
+      shell: bash
+      run: |
+        set +o pipefail
+        tail -f container_logs.txt | awk '{print} /Server Started/ {exit 0} /Failed to start/ {exit 1} /Error/ {exit 1}'
+        set -o pipefail
+    - name: check server is running
+      shell: bash
+      run: |
+        code=$(curl -sS -o /dev/null -w "%{http_code}" 'http://localhost:8080/system/health')
+        echo "Server health status code: $code"
+        if [ "$code" -ne 200 ]; then
+        echo "Server health check failed"
+        exit 1
+        fi
+
